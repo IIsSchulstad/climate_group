@@ -175,8 +175,10 @@ class ClimateGroup(GroupEntity, ClimateEntity):
             self.async_defer_or_update_ha_state()
 
             # Device target temperature change should be synced across all devices in the group
-            _LOGGER.debug("async_state_changed_listener event: %s", event)
-            self.async_set_temperature(ATTR_TEMPERATURE=5)
+            _LOGGER.debug(
+                "async_state_changed_listener event: %s", event.data["new_state"]
+            )
+            self.async_set_temperature(event.data["new_state"])
 
         self.async_on_remove(
             async_track_state_change_event(
