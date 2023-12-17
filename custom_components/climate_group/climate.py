@@ -35,6 +35,13 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
+from homeassistant.components.group import GroupEntity
+from homeassistant.components.group.util import (
+    find_state_attributes,
+    most_frequent_attribute,
+    reduce_attribute,
+    states_equal,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -51,14 +58,6 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-
-from homeassistant.components.group import GroupEntity
-from homeassistant.components.group.util import (
-    find_state_attributes,
-    most_frequent_attribute,
-    reduce_attribute,
-    states_equal,
-)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,6 +82,7 @@ SUPPORT_FLAGS = (
     | ClimateEntityFeature.SWING_MODE
     | ClimateEntityFeature.FAN_MODE
 )
+
 
 async def async_setup_platform(
     hass: HomeAssistant,
@@ -174,6 +174,9 @@ class ClimateGroup(GroupEntity, ClimateEntity):
             self.async_set_context(event.context)
             self.async_defer_or_update_ha_state()
 
+            # Device target temperature change should be synced across all devices in the group
+            self.async_set_temperature(event.data)
+
         self.async_on_remove(
             async_track_state_change_event(
                 self.hass, self._entity_ids, async_state_changed_listener
@@ -227,11 +230,12 @@ class ClimateGroup(GroupEntity, ClimateEntity):
             # Merge all effects from all effect_lists with a union merge.
             self._attr_hvac_modes = list(set().union(*all_hvac_modes))
 
-        
         current_hvac_modes = [x.state for x in states if x.state != HVACMode.OFF]
         # return the most common hvac mode (what the thermostat is set to do) except OFF
         if current_hvac_modes:
-            self._attr_hvac_mode = max(set(current_hvac_modes), key=current_hvac_modes.count)
+            self._attr_hvac_mode = max(
+                set(current_hvac_modes), key=current_hvac_modes.count
+            )
         # return off if all are off
         elif all(x.state == HVACMode.OFF for x in states):
             self._attr_preset_mode = HVACMode.OFF
@@ -244,7 +248,9 @@ class ClimateGroup(GroupEntity, ClimateEntity):
         current_hvac_actions = [a for a in hvac_actions if a != HVACAction.OFF]
         # return the most common action if it is not off
         if current_hvac_actions:
-            self._attr_hvac_action = max(set(current_hvac_actions), key=current_hvac_actions.count)
+            self._attr_hvac_action = max(
+                set(current_hvac_actions), key=current_hvac_actions.count
+            )
         # return action off if all are off
         elif all(a == HVACAction.OFF for a in hvac_actions):
             self._attr_hvac_action = HVACAction.OFF
