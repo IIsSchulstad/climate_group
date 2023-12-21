@@ -184,6 +184,13 @@ class ClimateGroup(GroupEntity, ClimateEntity):
                 ]
 
                 if new_target_temperature != self.attributes.get("temperature"):
+                    _LOGGER.info(
+                        "Updating target temperature for entity %s from %s to %s",
+                        event.data["entity_id"],
+                        self.attributes.get("temperature"),
+                        new_target_temperature,
+                    )
+
                     other_entity_ids = [
                         entity_id
                         for entity_id in self._entity_ids
@@ -191,11 +198,24 @@ class ClimateGroup(GroupEntity, ClimateEntity):
                     ]
 
                     for entity_id in other_entity_ids:
+                        _LOGGER.info(
+                            "Setting target temperature for entity %s to %s",
+                            entity_id,
+                            new_target_temperature,
+                        )
+
                         self.hass.states.async_set(
                             entity_id,
                             attributes={"temperature": new_target_temperature},
                             force_update=True,
                         )
+                else:
+                    _LOGGER.debug(
+                        "Target temperature for entity %s has not changed",
+                        event.data["entity_id"],
+                    )
+            else:
+                _LOGGER.warning("Invalid state change event: %s", event.data)
 
         self.async_on_remove(
             async_track_state_change_event(
